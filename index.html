@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Электоральная карта НСО</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:#fff5f5; color:#2b0a0a; }
+  header { background: linear-gradient(90deg,#c8102e,#a30d24); color:#fff;
+           padding:12px 20px; display:flex; gap:16px; align-items:center;
+           flex-wrap:wrap; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+  header h1 { font-size:18px; margin:0; letter-spacing:.5px; }
+  .multi-select { background:#fff; color:#2b0a0a; border-radius:6px;
+                  padding:6px 10px; min-width:260px; max-height:140px;
+                  overflow:auto; border:1px solid #f5c2c7; }
+  .multi-select label { display:block; font-size:13px; padding:2px 0; cursor:pointer; }
+  .multi-select input { margin-right:6px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:4px; padding:10px 20px;
+          background:#fff; border-bottom:1px solid #f5c2c7; }
+  .tab { padding:8px 14px; border-radius:6px; cursor:pointer; font-size:13px;
+         background:#ffe3e3; color:#a30d24; transition:.15s; }
+  .tab:hover { background:#ffc9c9; }
+  .tab.active { background:#c8102e; color:#fff; }
+  main { padding:20px; }
+  .panel { background:#fff; border-radius:10px; padding:16px;
+           box-shadow:0 1px 4px rgba(163,13,36,.08); margin-bottom:16px; }
+  table { border-collapse:collapse; width:100%; background:#fff; font-size:12px; }
+  th,td { padding:6px 8px; border-bottom:1px solid #ffe3e3;
+          text-align:left; white-space:nowrap; }
+  th { background:#ffe3e3; color:#a30d24; position:sticky; top:0; font-weight:600; }
+  tr:hover { background:#fff5f5; }
+  .btn { padding:6px 12px; border:1px solid #c8102e; background:#fff;
+         color:#c8102e; border-radius:6px; cursor:pointer; font-size:12px;
+         margin:4px 4px 4px 0; }
+  .btn:hover { background:#c8102e; color:#fff; }
+  .btn-primary { background:#c8102e; color:#fff; }
+  .btn-primary:hover { background:#a30d24; }
+  .chart { background:#fff; border-radius:10px; padding:12px;
+           box-shadow:0 1px 4px rgba(163,13,36,.08); }
+  .loading { padding:40px; text-align:center; color:#a30d24; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:900px) { .grid2 { grid-template-columns:1fr; } }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px;
+           font-size:11px; color:#fff; }
+  .hint { background:#fff5f5; border-left:4px solid #c8102e;
+          padding:10px 14px; font-size:13px; border-radius:4px;
+          margin-bottom:12px; line-height:1.55; }
+  .filters { display:flex; gap:12px; flex-wrap:wrap;
+             align-items:center; margin-bottom:12px; }
+  .filters label { font-size:13px; }
+  select,input[type=text] { padding:6px 8px; border:1px solid #f5c2c7;
+                            border-radius:6px; font-size:13px; background:#fff; }
+  .terr-box { max-height:180px; overflow:auto; border:1px solid #f5c2c7;
+              border-radius:6px; padding:8px; background:#fff; min-width:260px; }
+  .terr-box label { display:block; font-size:12px; padding:2px 0; cursor:pointer; }
+  .terr-box input { margin-right:6px; }
+  .pos { color:#0b8a3a; font-weight:600; }
+  .neg { color:#c1121f; font-weight:600; }
+  .chart { overflow: auto; max-height: 85vh; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; }
+  .card { background:#fff; border-radius:10px; padding:14px;
+          box-shadow:0 1px 4px rgba(163,13,36,.08); border-left:5px solid #c1121f; }
+  .card h3 { margin:0 0 8px 0; color:#c1121f; font-size:15px; }
+  .card .count { font-size:28px; font-weight:700; color:#a30d24; }
+  .card .uiks { font-size:12px; color:#555; margin-top:6px; line-height:1.5; word-break:break-word; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>🗳️ Электоральная карта НСО</h1>
+  <div>
+    <div style="font-size:12px;margin-bottom:4px;">Выборы (можно несколько):</div>
+    <div id="electionsBox" class="multi-select"></div>
+  </div>
+</header>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-tab="table">📋 Таблица</div>
+  <div class="tab" data-tab="bars">📊 Гистограммы</div>
+  <div class="tab" data-tab="dynamics">📈 Динамика</div>
+  <div class="tab" data-tab="turnout">🏃 Явка</div>
+  <div class="tab" data-tab="hist2">📶 Гистограммы УИК</div>
+  <div class="tab" data-tab="kprf">🔴 УИК где победила КПРФ</div>
+  <div class="tab" data-tab="top10">🏆 Топ-10</div>
+  <div class="tab" data-tab="compare">⚖️ Сравнить районы</div>
+</div>
+
+<main>
+  <div id="view"><div class="loading">Загрузка…</div></div>
+</main>
+
+<script>
+let elections = [];
+let selectedCodes = [];
+let allTerritories = [];
+
+const PARTY_ORDER = ["ER","KPRF","NEWPEOPLE","LDPR","SRZP"];
+const PARTY_NAMES = { ER:"ЕР", KPRF:"КПРФ", NEWPEOPLE:"НЛ", LDPR:"ЛДПР", SRZP:"СРЗП" };
+const PARTY_COLORS = { ER:"#1e6bb8", KPRF:"#c1121f", NEWPEOPLE:"#0b8a3a",
+                       LDPR:"#0a3d91", SRZP:"#f5a623" };
+
+async function api(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+const fmtPct = v => (v == null ? "—" : Number(v).toFixed(2) + "%");
+const fmtInt = v => (v == null ? "—" : Number(v).toLocaleString("ru"));
+
+async function init() {
+  elections = await api("/api/elections");
+  selectedCodes = [elections[0].code];
+
+  const box = document.getElementById("electionsBox");
+  box.innerHTML = elections.map(e => `
+    <label><input type="checkbox" value="${e.code}"
+      ${selectedCodes.includes(e.code) ? "checked" : ""}/>
+      ${e.title}</label>`).join("");
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = async () => {
+      selectedCodes = [...box.querySelectorAll("input:checked")].map(x => x.value);
+      if (!selectedCodes.length) { cb.checked = true; selectedCodes = [cb.value]; }
+      allTerritories = await api(`/api/territories/${encodeURIComponent(selectedCodes[0])}`);
+      render();
+    };
+  });
+
+  allTerritories = await api(`/api/territories/${encodeURIComponent(selectedCodes[0])}`);
+  render();
+}
+
+document.getElementById("tabs").onclick = (e) => {
+  if (!e.target.classList.contains("tab")) return;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  e.target.classList.add("active");
+  render();
+};
+const activeTab = () => document.querySelector(".tab.active").dataset.tab;
+
+async function render() {
+  const view = document.getElementById("view");
+  view.innerHTML = `<div class="loading">Загрузка…</div>`;
+  try {
+    const t = activeTab();
+    if (t === "table")    await renderTable(view);
+    if (t === "bars")     await renderBars(view);
+    if (t === "dynamics") await renderDynamics(view);
+    if (t === "turnout")  await renderTurnout(view);
+    if (t === "hist2")    await renderHist2(view);
+    if (t === "kprf")     await renderKprf(view);
+    if (t === "top10")    await renderTop10(view);
+    if (t === "compare")  await renderCompare(view);
+  } catch (e) {
+    view.innerHTML = `<div class="loading" style="color:#c8102e">Ошибка: ${e.message}</div>`;
+  }
+}
+/* ========== ТАБЛИЦА ========== */
+async function renderTable(view) {
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        Режимы:<br/>
+        • <b>Вся область</b> — сравнение по районам (лист <b>ТИК</b>).<br/>
+        • <b>Один район</b> — по всем УИК выбранного района (лист <b>УИК</b>).<br/>
+        • <b>Единый областной округ</b> — данные с листа <b>ОблИК</b>.<br/>
+        Δ по явке: абсолют (поздний год − ранний год).
+      </div>
+      <div class="filters">
+        <label>Режим:
+          <select id="tblMode">
+            <option value="all">Вся область (районы)</option>
+            <option value="one">Один район (УИК)</option>
+            <option value="oblik">Единый областной округ</option>
+          </select>
+        </label>
+        <label id="tblTerrWrap" style="display:none">Район:
+          <select id="tblTerr"></select>
+        </label>
+        <button class="btn btn-primary" onclick="redrawTable()">Обновить</button>
+        <button class="btn" onclick="exportPNG('tblWrap','table')">🖼 PNG</button>
+      </div>
+    </div>
+    <div id="tblWrap" class="panel"><div class="loading">Загрузка…</div></div>`;
+
+  document.getElementById("tblTerr").innerHTML =
+    allTerritories.map(t => `<option>${t}</option>`).join("");
+
+  document.getElementById("tblMode").onchange = (e) => {
+    const one = e.target.value === "one";
+    document.getElementById("tblTerrWrap").style.display = one ? "inline-block" : "none";
+    redrawTable();
+  };
+
+  redrawTable();
+}
+
+async function redrawTable() {
+  const mode = document.getElementById("tblMode").value;
+  const wrap = document.getElementById("tblWrap");
+
+  // ===== Режим «Единый областной округ» =====
+  if (mode === "oblik") {
+    const rows = [];
+    for (const c of selectedCodes) {
+      const r = await api(`/api/oblik/${encodeURIComponent(c)}`);
+      rows.push(r);
+    }
+    let h = `<div style="margin-bottom:8px;font-size:13px;color:#a30d24">
+      Источник: <b>лист ОблИК</b> · единый областной избирательный округ</div>`;
+    h += `<div style="overflow:auto"><table><thead><tr>`;
+    h += `<th>Показатель</th>`;
+    for (const c of selectedCodes) {
+      const e = elections.find(x => x.code === c);
+      h += `<th>${e.level} · ${e.year}</th>`;
+    }
+    h += `</tr></thead><tbody>`;
+    h += `<tr><td><b>Явка, абс.</b></td>` +
+         rows.map(r => `<td>${fmtInt(r.turnout_abs)}</td>`).join("") + `</tr>`;
+    h += `<tr><td><b>Явка, %</b></td>` +
+         rows.map(r => `<td>${fmtPct(r.turnout_pct)}</td>`).join("") + `</tr>`;
+    h += `<tr><td><b>Избирателей</b></td>` +
+         rows.map(r => `<td>${fmtInt(r.voters)}</td>`).join("") + `</tr>`;
+    for (const pc of PARTY_ORDER) {
+      const col = PARTY_COLORS[pc];
+      h += `<tr><td style="background:${col};color:#fff"><b>${PARTY_NAMES[pc]} — голоса</b></td>` +
+           rows.map(r => {
+             const p = r.parties.find(x => x.party_code === pc);
+             return `<td>${p ? fmtInt(p.votes) : "—"}</td>`;
+           }).join("") + `</tr>`;
+      h += `<tr><td style="background:${col};color:#fff"><b>${PARTY_NAMES[pc]} — %</b></td>` +
+           rows.map(r => {
+             const p = r.parties.find(x => x.party_code === pc);
+             return `<td>${p ? fmtPct(p.pct) : "—"}</td>`;
+           }).join("") + `</tr>`;
+    }
+    h += `</tbody></table></div>`;
+    wrap.innerHTML = h;
+    return;
+  }
+
+  // Хронологический порядок выбранных кодов (по году)
+  const chronological = [...selectedCodes].sort((a, b) => {
+    const ya = elections.find(e => e.code === a).year;
+    const yb = elections.find(e => e.code === b).year;
+    return ya - yb;
+  });
+  const firstCode = chronological[0];
+  const lastCode = chronological[chronological.length - 1];
+  const showDelta = selectedCodes.length >= 2;
+
+  // ===== Режим «Один район» =====
+  if (mode === "one") {
+    const terr = document.getElementById("tblTerr").value;
+    const byCode = {};
+    for (const c of selectedCodes) {
+      byCode[c] = await api(
+        `/api/uik-list/${encodeURIComponent(c)}?territory=${encodeURIComponent(terr)}`
+      );
+    }
+    const uikSet = new Set();
+    Object.values(byCode).forEach(arr => arr.forEach(r => uikSet.add(r.uik)));
+    const uikList = [...uikSet].sort((a, b) => a - b);
+
+    let h = `<div style="margin-bottom:8px;font-size:13px;color:#a30d24">
+      Источник: <b>лист УИК</b> · район <b>${terr}</b>
+      ${showDelta ? ' · Δ по <b>абсолютным голосам</b> и <b>абсолютной явке</b>' : ''}</div>`;
+    h += `<div style="overflow:auto;max-height:70vh"><table><thead><tr>`;
+    h += `<th>УИК</th>`;
+    for (const c of selectedCodes) {
+      const e = elections.find(x => x.code === c);
+      h += `<th>Явка абс. · ${e.year}</th>`;
+      h += `<th>Явка % · ${e.year}</th>`;
+    }
+    if (showDelta) {
+      h += `<th style="background:#7a0619;color:#fff">Δ явка (абс.)</th>`;
+    }
+    for (const pc of PARTY_ORDER) {
+      const col = PARTY_COLORS[pc];
+      h += `<th style="background:${col};color:#fff">${PARTY_NAMES[pc]} — голоса</th>`;
+      h += `<th style="background:${col};color:#fff">${PARTY_NAMES[pc]} — %</th>`;
+      if (showDelta) {
+        h += `<th style="background:${col};color:#fff">Δ ${PARTY_NAMES[pc]}, голосов</th>`;
+      }
+    }
+    h += `</tr></thead><tbody>`;
+    for (const uik of uikList) {
+      h += `<tr><td><b>${uik}</b></td>`;
+      for (const c of selectedCodes) {
+        const r = byCode[c].find(x => x.uik === uik);
+        h += `<td>${r ? fmtInt(r.turnout_abs) : "—"}</td>`;
+        h += `<td>${r ? fmtPct(r.turnout_pct) : "—"}</td>`;
+      }
+      if (showDelta) {
+        const rF = byCode[firstCode].find(x => x.uik === uik);
+        const rL = byCode[lastCode].find(x => x.uik === uik);
+        if (rF?.turnout_abs != null && rL?.turnout_abs != null) {
+          const d = rL.turnout_abs - rF.turnout_abs;
+          const cls = d > 0 ? "pos" : (d < 0 ? "neg" : "");
+          const sign = d > 0 ? "+" : "";
+          h += `<td class="${cls}">${sign}${fmtInt(d)}</td>`;
+        } else {
+          h += `<td>—</td>`;
+        }
+      }
+      for (const pc of PARTY_ORDER) {
+        h += `<td>` + selectedCodes.map(c => {
+          const r = byCode[c].find(x => x.uik === uik);
+          const p = r?.parties.find(x => x.party_code === pc);
+          return p ? fmtInt(p.votes) : "—";
+        }).join(" / ") + `</td>`;
+        h += `<td>` + selectedCodes.map(c => {
+          const r = byCode[c].find(x => x.uik === uik);
+          const p = r?.parties.find(x => x.party_code === pc);
+          return p ? fmtPct(p.pct) : "—";
+        }).join(" / ") + `</td>`;
+        if (showDelta) {
+          const rF = byCode[firstCode].find(x => x.uik === uik);
+          const rL = byCode[lastCode].find(x => x.uik === uik);
+          const pF = rF?.parties.find(x => x.party_code === pc);
+          const pL = rL?.parties.find(x => x.party_code === pc);
+          if (pF?.votes != null && pL?.votes != null) {
+            const d = pL.votes - pF.votes;
+            const cls = d > 0 ? "pos" : (d < 0 ? "neg" : "");
+            const sign = d > 0 ? "+" : "";
+            h += `<td class="${cls}">${sign}${fmtInt(d)}</td>`;
+          } else {
+            h += `<td>—</td>`;
+          }
+        }
+      }
+      h += `</tr>`;
+    }
+    h += `</tbody></table></div>`;
+    wrap.innerHTML = h;
+    return;
+  }
+
+  // ===== Режим «Вся область» =====
+  const codesParam = selectedCodes.join(",");
+  const data = await api(
+    `/api/multi-results?codes=${encodeURIComponent(codesParam)}&source=TIK`
+  );
+  const rowSet = new Set();
+  Object.values(data).forEach(arr => arr.forEach(r => rowSet.add(r.territory)));
+  const rowsList = [...rowSet].sort();
+
+  let h = `<div style="margin-bottom:8px;font-size:13px;color:#a30d24">
+    Источник: <b>лист ТИК</b>
+    ${showDelta ? ' · Δ по <b>абсолютным голосам</b> и <b>абсолютной явке</b> (поздний год − ранний год)' : ''}</div>`;
+  h += `<div style="overflow:auto;max-height:70vh"><table><thead><tr>`;
+  h += `<th>Район</th>`;
+  for (const c of selectedCodes) {
+    const el = elections.find(e => e.code === c);
+    h += `<th>Явка абс. · ${el.year}</th>`;
+    h += `<th>Явка % · ${el.year}</th>`;
+  }
+  if (showDelta) {
+    h += `<th style="background:#7a0619;color:#fff">Δ явка (абс.)</th>`;
+  }
+  for (const pc of PARTY_ORDER) {
+    const col = PARTY_COLORS[pc];
+    h += `<th style="background:${col};color:#fff">${PARTY_NAMES[pc]} — голоса</th>`;
+    h += `<th style="background:${col};color:#fff">${PARTY_NAMES[pc]} — %</th>`;
+    if (showDelta) {
+      h += `<th style="background:${col};color:#fff">Δ ${PARTY_NAMES[pc]}, голосов</th>`;
+    }
+  }
+  h += `</tr></thead><tbody>`;
+
+  for (const t of rowsList) {
+    h += `<tr><td><b>${t}</b></td>`;
+    for (const c of selectedCodes) {
+      const r = data[c]?.find(x => x.territory === t);
+      h += `<td>${r ? fmtInt(r.turnout_abs) : "—"}</td>`;
+      h += `<td>${r ? fmtPct(r.turnout_pct) : "—"}</td>`;
+    }
+    if (showDelta) {
+      const rF = data[firstCode]?.find(x => x.territory === t);
+      const rL = data[lastCode]?.find(x => x.territory === t);
+      if (rF?.turnout_abs != null && rL?.turnout_abs != null) {
+        const d = rL.turnout_abs - rF.turnout_abs;
+        const cls = d > 0 ? "pos" : (d < 0 ? "neg" : "");
+        const sign = d > 0 ? "+" : "";
+        h += `<td class="${cls}">${sign}${fmtInt(d)}</td>`;
+      } else {
+        h += `<td>—</td>`;
+      }
+    }
+    for (const pc of PARTY_ORDER) {
+      h += `<td>` + selectedCodes.map(c => {
+        const r = data[c]?.find(x => x.territory === t);
+        const p = r?.parties.find(x => x.party_code === pc);
+        return p ? fmtInt(p.votes) : "—";
+      }).join(" / ") + `</td>`;
+      h += `<td>` + selectedCodes.map(c => {
+        const r = data[c]?.find(x => x.territory === t);
+        const p = r?.parties.find(x => x.party_code === pc);
+        return p ? fmtPct(p.pct) : "—";
+      }).join(" / ") + `</td>`;
+      if (showDelta) {
+        const rF = data[firstCode]?.find(x => x.territory === t);
+        const rL = data[lastCode]?.find(x => x.territory === t);
+        const pF = rF?.parties.find(x => x.party_code === pc);
+        const pL = rL?.parties.find(x => x.party_code === pc);
+        if (pF?.votes != null && pL?.votes != null) {
+          const d = pL.votes - pF.votes;
+          const cls = d > 0 ? "pos" : (d < 0 ? "neg" : "");
+          const sign = d > 0 ? "+" : "";
+          h += `<td class="${cls}">${sign}${fmtInt(d)}</td>`;
+        } else {
+          h += `<td>—</td>`;
+        }
+      }
+    }
+    h += `</tr>`;
+  }
+  h += `</tbody></table></div>`;
+  wrap.innerHTML = h;
+}
+/* ========== ГИСТОГРАММЫ (партии) ========== */
+async function renderBars(view) {
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        <b>Гистограммы по партиям.</b><br/>
+        Выберите выборы, партию и режим (вся область / один район).<br/>
+        Можно сравнивать абсолютные голоса или проценты.
+      </div>
+      <div class="filters">
+        <label>Выборы:
+          <select id="barCode">
+            ${selectedCodes.map(c => {
+              const e = elections.find(x => x.code === c);
+              return `<option value="${c}">${e.level} · ${e.year}</option>`;
+            }).join("")}
+          </select>
+        </label>
+        <label>Партия:
+          <select id="barParty">
+            ${PARTY_ORDER.map(pc => `<option value="${pc}">${PARTY_NAMES[pc]}</option>`).join("")}
+          </select>
+        </label>
+        <label>Метрика:
+          <select id="barMetric">
+            <option value="votes">Абсолютные голоса</option>
+            <option value="pct">Проценты</option>
+          </select>
+        </label>
+        <label>Режим:
+          <select id="barMode">
+            <option value="all">Вся область (районы)</option>
+            <option value="one">Один район (УИК)</option>
+          </select>
+        </label>
+        <label id="barTerrWrap" style="display:none">Район:
+          <select id="barTerr">
+            ${allTerritories.map(t => `<option>${t}</option>`).join("")}
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="redrawBars()">Обновить</button>
+        <button class="btn" onclick="exportPNG('barsChart','bars')">🖼 PNG</button>
+      </div>
+    </div>
+    <div id="barsChart" class="chart" style="height:640px"></div>`;
+
+  document.getElementById("barMode").onchange = (e) => {
+    document.getElementById("barTerrWrap").style.display =
+      e.target.value === "one" ? "inline-block" : "none";
+    redrawBars();
+  };
+  redrawBars();
+}
+
+async function redrawBars() {
+  const code = document.getElementById("barCode").value;
+  const party = document.getElementById("barParty").value;
+  const metric = document.getElementById("barMetric").value;
+  const mode = document.getElementById("barMode").value;
+  const terr = document.getElementById("barTerr")?.value;
+
+  let rows, labels, values;
+  if (mode === "one") {
+    rows = await api(`/api/uik-list/${encodeURIComponent(code)}?territory=${encodeURIComponent(terr)}`);
+    labels = rows.map(r => `УИК ${r.uik}`);
+    values = rows.map(r => {
+      const p = r.parties.find(x => x.party_code === party);
+      return p ? p[metric] : 0;
+    });
+  } else {
+    rows = await api(`/api/results/${encodeURIComponent(code)}`);
+    labels = rows.map(r => r.territory);
+    values = rows.map(r => {
+      const p = r.parties.find(x => x.party_code === party);
+      return p ? p[metric] : 0;
+    });
+  }
+
+  const chart = echarts.init(document.getElementById("barsChart"));
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    grid: { left: 200, right: 60, top: 30, bottom: 40 },
+    xAxis: { type: "value", name: metric === "pct" ? "%" : "голосов" },
+    yAxis: { type: "category", data: labels,
+             axisLabel: { fontSize: 11, width: 190, overflow: "truncate" } },
+    series: [{
+      type: "bar",
+      data: values,
+      itemStyle: { color: PARTY_COLORS[party] },
+      label: {
+        show: true, position: "right", fontSize: 11,
+        formatter: (p) => metric === "pct" ? p.value + "%" : Number(p.value).toLocaleString("ru"),
+      },
+    }],
+  });
+  window.addEventListener("resize", () => chart.resize());
+}
+
+
+/* ========== ДИНАМИКА ========== */
+async function renderDynamics(view) {
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        <b>Динамика партий по годам.</b><br/>
+        • «Вся область» — источник <b>ОблИК</b>.<br/>
+        • «Конкретный район» — источник <b>ТИК</b>.<br/>
+        Можно сравнивать абсолютные голоса или проценты.
+      </div>
+      <div class="filters">
+        <label>Режим:
+          <select id="dynMode">
+            <option value="all">Вся область (ОблИК)</option>
+            <option value="terr">Конкретный район (ТИК)</option>
+          </select>
+        </label>
+        <label id="dynTerrWrap" style="display:none">Район:
+          <select id="dynTerr">
+            ${allTerritories.map(t => `<option>${t}</option>`).join("")}
+          </select>
+        </label>
+        <label>Метрика:
+          <select id="dynMetric">
+            <option value="pct">Проценты</option>
+            <option value="votes">Абсолютные голоса</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="redrawDyn()">Обновить</button>
+        <button class="btn" onclick="exportPNG('dynChart','dynamics')">🖼 PNG</button>
+      </div>
+    </div>
+    <div id="dynChart" class="chart" style="height:560px"></div>`;
+
+  document.getElementById("dynMode").onchange = (e) => {
+    document.getElementById("dynTerrWrap").style.display =
+      e.target.value === "terr" ? "inline-block" : "none";
+    redrawDyn();
+  };
+  redrawDyn();
+}
+
+async function redrawDyn() {
+  const mode = document.getElementById("dynMode").value;
+  const terr = document.getElementById("dynTerr")?.value;
+  const metric = document.getElementById("dynMetric").value;
+
+  const url = (mode === "terr")
+    ? `/api/dynamics?territory=${encodeURIComponent(terr)}`
+    : `/api/dynamics`;
+  const data = await api(url);
+
+  const dates = [...new Set(data.map(d => d.election_date))].sort();
+  const parties = [...new Set(data.map(d => d.party_code))];
+
+  const title = (mode === "terr")
+    ? `Источник: ТИК · район «${terr}»`
+    : `Источник: ОблИК · вся область`;
+
+  const chart = echarts.init(document.getElementById("dynChart"));
+  chart.setOption({
+    title: {
+      text: title, left: "center", top: 0,
+      textStyle: { fontSize: 12, color: "#a30d24" },
+    },
+    tooltip: { trigger: "axis" },
+    legend: { top: 28, textStyle: { fontSize: 12 } },
+    grid: { left: 70, right: 20, bottom: 40, top: 70 },
+    xAxis: { type: "category", data: dates },
+    yAxis: { type: "value", name: metric === "pct" ? "% голосов" : "голоса" },
+    series: parties.map(pc => ({
+      name: PARTY_NAMES[pc] || pc,
+      type: "line", smooth: false, symbolSize: 5,
+      lineStyle: { width: 1.5 },
+      itemStyle: { color: PARTY_COLORS[pc] || "#888" },
+      data: dates.map(dt => {
+        const row = data.find(d => d.election_date === dt && d.party_code === pc);
+        return row ? row[metric] : null;
+      }),
+    })),
+  });
+  window.addEventListener("resize", () => chart.resize());
+}
+
+
+/* ========== ЯВКА ========== */
+async function renderTurnout(view) {
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        <b>Явка по годам.</b><br/>
+        • «Вся область» — источник <b>ОблИК</b>.<br/>
+        • «Конкретный район» — источник <b>ТИК</b>.<br/>
+        Можно смотреть проценты или абсолютные значения.
+      </div>
+      <div class="filters">
+        <label>Режим:
+          <select id="toMode">
+            <option value="all">Вся область (ОблИК)</option>
+            <option value="one">Конкретный район (ТИК)</option>
+          </select>
+        </label>
+        <label id="toTerrWrap" style="display:none">Район:
+          <select id="toTerr">
+            ${allTerritories.map(t => `<option>${t}</option>`).join("")}
+          </select>
+        </label>
+        <label>Метрика:
+          <select id="toMetric">
+            <option value="pct">Проценты</option>
+            <option value="abs">Абсолют</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="redrawTurnout()">Обновить</button>
+        <button class="btn" onclick="exportPNG('turnoutChart','turnout')">🖼 PNG</button>
+      </div>
+    </div>
+    <div id="turnoutChart" class="chart" style="height:500px"></div>`;
+
+  document.getElementById("toMode").onchange = (e) => {
+    document.getElementById("toTerrWrap").style.display =
+      e.target.value === "one" ? "inline-block" : "none";
+    redrawTurnout();
+  };
+  redrawTurnout();
+}
+
+async function redrawTurnout() {
+  const mode = document.getElementById("toMode").value;
+  const terr = document.getElementById("toTerr")?.value;
+  const metric = document.getElementById("toMetric").value;
+  const url = mode === "one"
+    ? `/api/turnout-dynamics?territory=${encodeURIComponent(terr)}`
+    : `/api/turnout-dynamics`;
+  const data = await api(url);
+
+  const chart = echarts.init(document.getElementById("turnoutChart"));
+  chart.setOption({
+    tooltip: {
+      trigger: "axis",
+      formatter: (p) => {
+        const row = data[p[0].dataIndex];
+        return `${row.election_date}<br/>Явка: <b>${row.turnout_pct}%</b>
+                <br/>Проголосовало: ${fmtInt(row.turnout_abs)}
+                <br/>Избирателей: ${fmtInt(row.voters)}`;
+      },
+    },
+    grid: { left: 70, right: 20, bottom: 40, top: 40 },
+    xAxis: { type: "category", data: data.map(d => d.election_date) },
+    yAxis: { type: "value", name: metric === "pct" ? "Явка, %" : "Человек" },
+    series: [{
+      type: "line", smooth: false,
+      data: data.map(d => metric === "pct" ? d.turnout_pct : d.turnout_abs),
+      itemStyle: { color: "#c8102e" },
+      lineStyle: { width: 1.5 },
+      symbolSize: 5,
+      areaStyle: { color: "rgba(200,16,46,0.15)" },
+      label: {
+        show: true,
+        formatter: (p) => metric === "pct" ? p.value + "%" : Number(p.value).toLocaleString("ru"),
+        fontSize: 10,
+      },
+    }],
+  });
+  window.addEventListener("resize", () => chart.resize());
+}
+/* ========== ГИСТОГРАММЫ УИК (замена Heatmap) ========== */
+async function renderHist2(view) {
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        <b>Гистограммы по участкам/районам.</b><br/>
+        Выберите выборы и метрику. Можно смотреть по всем районам
+        или по всем УИК конкретного района.<br/>
+        • Вся область → явка по районам (ТИК).<br/>
+        • Один район → явка по УИК (УИК).
+      </div>
+      <div class="filters">
+        <label>Выборы:
+          <select id="h2Code">
+            ${selectedCodes.map(c => {
+              const e = elections.find(x => x.code === c);
+              return `<option value="${c}">${e.level} · ${e.year}</option>`;
+            }).join("")}
+          </select>
+        </label>
+        <label>Метрика:
+          <select id="h2Metric">
+            <option value="pct">Явка, %</option>
+            <option value="abs">Явка, абс.</option>
+          </select>
+        </label>
+        <label>Режим:
+          <select id="h2Mode">
+            <option value="all">Вся область (районы)</option>
+            <option value="one">Один район (УИК)</option>
+          </select>
+        </label>
+        <label id="h2TerrWrap" style="display:none">Район:
+          <select id="h2Terr">
+            ${allTerritories.map(t => `<option>${t}</option>`).join("")}
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="redrawHist2()">Обновить</button>
+        <button class="btn" onclick="exportPNG('hist2Chart','hist2')">🖼 PNG</button>
+      </div>
+    </div>
+    <div id="hist2Chart" class="chart" style="height:640px"></div>`;
+
+  document.getElementById("h2Mode").onchange = (e) => {
+    document.getElementById("h2TerrWrap").style.display =
+      e.target.value === "one" ? "inline-block" : "none";
+    redrawHist2();
+  };
+  redrawHist2();
+}
+
+async function redrawHist2() {
+  const code = document.getElementById("h2Code").value;
+  const metric = document.getElementById("h2Metric").value;
+  const mode = document.getElementById("h2Mode").value;
+  const terr = document.getElementById("h2Terr")?.value;
+
+  let labels, values;
+  if (mode === "one") {
+    const rows = await api(`/api/uik-list/${encodeURIComponent(code)}?territory=${encodeURIComponent(terr)}`);
+    labels = rows.map(r => `УИК ${r.uik}`);
+    values = rows.map(r => metric === "pct" ? r.turnout_pct : r.turnout_abs);
+  } else {
+    const rows = await api(`/api/results/${encodeURIComponent(code)}`);
+    labels = rows.map(r => r.territory);
+    values = rows.map(r => metric === "pct" ? r.turnout_pct : r.turnout_abs);
+  }
+
+  const chart = echarts.init(document.getElementById("hist2Chart"));
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    grid: { left: 200, right: 60, top: 30, bottom: 40 },
+    xAxis: { type: "value", name: metric === "pct" ? "%" : "человек" },
+    yAxis: { type: "category", data: labels,
+             axisLabel: { fontSize: 11, width: 190, overflow: "truncate" } },
+    series: [{
+      type: "bar",
+      data: values,
+      itemStyle: { color: "#c8102e" },
+      label: {
+        show: true, position: "right", fontSize: 11,
+        formatter: (p) => metric === "pct" ? p.value + "%" : Number(p.value).toLocaleString("ru"),
+      },
+    }],
+  });
+  window.addEventListener("resize", () => chart.resize());
+}
+
+
+/* ========== УИК ГДЕ ПОБЕДИЛА КПРФ ========== */
+async function renderKprf(view) {
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        <b>Районы, где КПРФ победила на участках.</b><br/>
+        Выберите выборы — увидите карточки районов, отсортированные
+        по убыванию количества УИК, на которых КПРФ заняла первое
+        место по числу голосов.
+      </div>
+      <div class="filters">
+        <label>Выборы:
+          <select id="kprfCode">
+            ${selectedCodes.map(c => {
+              const e = elections.find(x => x.code === c);
+              return `<option value="${c}">${e.level} · ${e.year}</option>`;
+            }).join("")}
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="redrawKprf()">Обновить</button>
+      </div>
+    </div>
+    <div id="kprfCards" class="cards"></div>`;
+
+  redrawKprf();
+}
+
+async function redrawKprf() {
+  const code = document.getElementById("kprfCode").value;
+  const data = await api(`/api/kprf-wins/${encodeURIComponent(code)}`);
+  const box = document.getElementById("kprfCards");
+  if (!data.length) {
+    box.innerHTML = `<div class="panel">На выбранных выборах нет участков, где победила КПРФ.</div>`;
+    return;
+  }
+  box.innerHTML = data.map(r => `
+    <div class="card">
+      <h3>${r.territory}</h3>
+      <div class="count">${r.count} УИК</div>
+      <div class="uiks">
+        Участки: ${r.uiks.join(", ")}
+      </div>
+    </div>
+  `).join("");
+}
+
+
+/* ========== ТОП-10 ========== */
+async function renderTop10(view) {
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        <b>Топ-10 районов</b> по выбранной партии и году.
+        Источник — <b>ТИК</b>.
+      </div>
+      <div class="filters">
+        <label>Выборы:
+          <select id="top10Code">
+            ${selectedCodes.map(c => {
+              const el = elections.find(e => e.code === c);
+              return `<option value="${c}">${el.level} · ${el.year}</option>`;
+            }).join("")}
+          </select>
+        </label>
+        <label>Партия:
+          <select id="top10Party">
+            ${PARTY_ORDER.map(pc => `<option value="${pc}">${PARTY_NAMES[pc]}</option>`).join("")}
+          </select>
+        </label>
+        <label>Метрика:
+          <select id="top10By">
+            <option value="pct">Доля, %</option>
+            <option value="votes">Голоса</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" onclick="redrawTop10()">Обновить</button>
+        <button class="btn" onclick="exportPNG('top10Chart','top10')">🖼 PNG</button>
+      </div>
+    </div>
+    <div id="top10Chart" class="chart" style="height:540px"></div>`;
+  redrawTop10();
+}
+
+async function redrawTop10() {
+  const code = document.getElementById("top10Code").value;
+  const party = document.getElementById("top10Party").value;
+  const by = document.getElementById("top10By").value;
+  const data = await api(`/api/top10/${encodeURIComponent(code)}/${party}?by=${by}`);
+  const terrs = data.map(r => r.territory).reverse();
+  const values = data.map(r => {
+    const p = r.parties.find(x => x.party_code === party);
+    return p ? p[by] : 0;
+  }).reverse();
+
+  const chart = echarts.init(document.getElementById("top10Chart"));
+  chart.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    grid: { left: 220, right: 60, top: 20, bottom: 40 },
+    xAxis: { type: "value", name: by === "pct" ? "%" : "голосов" },
+    yAxis: { type: "category", data: terrs,
+             axisLabel: { fontSize: 11, width: 200, overflow: "truncate" } },
+    series: [{
+      type: "bar",
+      data: values,
+      itemStyle: { color: PARTY_COLORS[party] },
+      label: {
+        show: true, position: "right", fontSize: 11,
+        formatter: (p) => by === "pct" ? p.value + "%" : Number(p.value).toLocaleString("ru"),
+      },
+    }],
+  });
+  window.addEventListener("resize", () => chart.resize());
+}
+
+
+/* ========== СРАВНИТЬ РАЙОНЫ ========== */
+async function renderCompare(view) {
+  const codeOptions = selectedCodes.map(c => {
+    const e = elections.find(x => x.code === c);
+    return { code: c, label: `${e.level} · ${e.year}` };
+  });
+  const makeCodeSelect = (id, selectedIdx) => `
+    <select id="${id}">
+      ${codeOptions.map((o, i) =>
+        `<option value="${o.code}" ${i === selectedIdx ? "selected" : ""}>${o.label}</option>`
+      ).join("")}
+    </select>`;
+
+  view.innerHTML = `
+    <div class="panel">
+      <div class="hint">
+        <b>Сравнение двух территорий.</b> Источник — <b>ТИК</b>.<br/>
+        Для каждого района можно выбрать свой год — удобно сравнивать
+        один район в разные годы или разные районы в разные годы.
+      </div>
+      <div class="filters">
+        <label>Район A:
+          <select id="cmpA">
+            ${allTerritories.map(t => `<option>${t}</option>`).join("")}
+          </select>
+        </label>
+        <label>Выборы A:
+          ${makeCodeSelect("cmpCodeA", 0)}
+        </label>
+        <label>Район B:
+          <select id="cmpB">
+            ${allTerritories.map((t, i) =>
+              `<option ${i === 1 ? "selected" : ""}>${t}</option>`).join("")}
+          </select>
+        </label>
+        <label>Выборы B:
+          ${makeCodeSelect("cmpCodeB", Math.min(1, codeOptions.length - 1))}
+        </label>
+        <button class="btn btn-primary" onclick="redrawCompare()">Обновить</button>
+      </div>
+    </div>
+    <div class="grid2" id="cmpWrap"></div>`;
+  redrawCompare();
+}
+
+async function redrawCompare() {
+  const a = document.getElementById("cmpA").value;
+  const b = document.getElementById("cmpB").value;
+  const codeA = document.getElementById("cmpCodeA").value;
+  const codeB = document.getElementById("cmpCodeB").value;
+
+  // Загружаем оба года (могут совпадать — тогда один запрос)
+  const cache = {};
+  async function getResults(code) {
+    if (!cache[code]) cache[code] = await api(`/api/results/${encodeURIComponent(code)}`);
+    return cache[code];
+  }
+  const dataA = await getResults(codeA);
+  const dataB = await getResults(codeB);
+  const ra = dataA.find(x => x.territory === a);
+  const rb = dataB.find(x => x.territory === b);
+
+  const labelA = codeOptionsLabel(codeA);
+  const labelB = codeOptionsLabel(codeB);
+
+  function card(title, sub, r, other) {
+    if (!r) return `<div class="panel"><b>${title}</b><br/>Нет данных</div>`;
+    let h = `<div class="panel">
+      <h3 style="margin-top:0;color:#c8102e">${title}</h3>
+      <div style="font-size:12px;color:#a30d24;margin-bottom:8px">${sub}</div>
+      <p>Явка: <b>${fmtPct(r.turnout_pct)}</b><br/>
+      Проголосовало: <b>${fmtInt(r.turnout_abs)}</b><br/>
+      Избирателей: <b>${fmtInt(r.voters)}</b></p>
+      <table><thead><tr>
+        <th>Партия</th><th>Голоса</th><th>%</th>
+        ${other ? `<th>Δ голосов<br/>(отн. второго)</th>` : ""}
+      </tr></thead><tbody>`;
+    for (const pc of PARTY_ORDER) {
+      const p = r.parties.find(x => x.party_code === pc);
+      let delta = "";
+      if (other) {
+        const po = other.parties.find(x => x.party_code === pc);
+        if (p?.votes != null && po?.votes != null) {
+          const d = p.votes - po.votes;
+          const cls = d > 0 ? "pos" : (d < 0 ? "neg" : "");
+          const sign = d > 0 ? "+" : "";
+          delta = `<td class="${cls}">${sign}${fmtInt(d)}</td>`;
+        } else {
+          delta = `<td>—</td>`;
+        }
+      }
+      h += `<tr><td>${PARTY_NAMES[pc]}</td>
+            <td>${p ? fmtInt(p.votes) : "—"}</td>
+            <td>${p ? fmtPct(p.pct) : "—"}</td>
+            ${delta}
+            </tr>`;
+    }
+    return h + `</tbody></table></div>`;
+  }
+
+  // Подписи для сравнения
+  const titleA = `${a} · ${labelA}`;
+  const titleB = `${b} · ${labelB}`;
+
+  document.getElementById("cmpWrap").innerHTML =
+    card(titleA, `Сравнение с: ${titleB}`, ra, rb) +
+    card(titleB, `Сравнение с: ${titleA}`, rb, ra);
+}
+
+function codeOptionsLabel(code) {
+  const e = elections.find(x => x.code === code);
+  return e ? `${e.level} · ${e.year}` : code;
+}
+
+
+/* ========== ЭКСПОРТ ========== */
+function exportPNG(elId, name) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  html2canvas(el, { backgroundColor: "#ffffff", scale: 2 }).then(canvas => {
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = name + ".png";
+    a.click();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
